@@ -22,7 +22,9 @@ import gfm from 'remark-gfm';
  *
  * @param body any Markdown or GFM content
  */
-export function markdownToBlocks(body: string): notion.Block[] {
+export function markdownToBlocks(
+  body: string
+): (notion.Block | notion.ImageBlock)[] {
   const root = unified().use(markdown).use(gfm).parse(body);
 
   return parseBlocks(root as unknown as md.Root);

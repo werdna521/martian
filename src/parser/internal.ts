@@ -44,9 +44,47 @@ function parseInline(
   }
 }
 
-function parseParagraph(element: md.Paragraph): notion.ParagraphBlock {
-  const text = element.children.flatMap(child => parseInline(child));
-  return notion.paragraph(text);
+function parseImage(element: md.PhrasingContent): notion.ImageBlock {
+  if (element.type === 'image') {
+    return notion.image(element.url);
+  }
+  return notion.image('');
+}
+
+type Paragraph = {
+  type: 'rich-text' | 'image';
+  value: any;
+};
+function parseParagraph(
+  element: md.Paragraph
+): (notion.ParagraphBlock | notion.ImageBlock)[] {
+  const paragraph = element.children.flatMap(child => {
+    const type = child.type === 'image' ? 'image' : 'rich-text';
+    const value =
+      child.type === 'image' ? parseImage(child) : parseInline(child);
+
+    return {
+      type,
+      value,
+    };
+  }) as Paragraph[];
+
+  return paragraph.reduce((acc, p, index) => {
+    const {type, value} = p;
+    const groupCount = acc.length;
+    const firstGroups = acc.slice(0, groupCount - 1);
+    const lastGroup = acc[groupCount - 1] || [];
+
+    if (type === 'image') {
+      if (paragraph[index - 1]?.type === 'rich-text')
+        return [...firstGroups, notion.paragraph(lastGroup), value];
+      return [...firstGroups, lastGroup, value];
+    }
+
+    if (paragraph[index - 1]?.type === 'image')
+      return [...firstGroups, lastGroup, [value]];
+    return [...firstGroups, [...lastGroup, value]];
+  }, [] as any[]);
 }
 
 function parseHeading(
@@ -100,13 +138,13 @@ function parseList(
   });
 }
 
-function parseNode(node: md.FlowContent): notion.Block[] {
+function parseNode(node: md.FlowContent): (notion.Block | notion.ImageBlock)[] {
   switch (node.type) {
     case 'heading':
       return [parseHeading(node)];
 
     case 'paragraph':
-      return [parseParagraph(node)];
+      return [...parseParagraph(node)];
 
     case 'code':
       return [parseCode(node)];
@@ -122,7 +160,9 @@ function parseNode(node: md.FlowContent): notion.Block[] {
   }
 }
 
-export function parseBlocks(root: md.Root): notion.Block[] {
+export function parseBlocks(
+  root: md.Root
+): (notion.Block | notion.ImageBlock)[] {
   return root.children.flatMap(parseNode);
 }
 

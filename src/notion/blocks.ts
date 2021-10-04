@@ -7,7 +7,18 @@ import type {
   ParagraphBlock,
   RichText,
   ToDoBlock,
+  BlockBase,
 } from '@notionhq/client/build/src/api-types';
+
+export interface ImageBlock extends BlockBase {
+  type: 'image';
+  image: {
+    type: 'external';
+    external: {
+      url: string;
+    };
+  };
+}
 
 export function paragraph(text: RichText[]): ParagraphBlock {
   return {
@@ -78,4 +89,17 @@ export function toDo(checked: boolean, text: RichText[]): ToDoBlock {
       checked: checked,
     },
   } as ToDoBlock;
+}
+
+export function image(link: string): ImageBlock {
+  return {
+    object: 'block',
+    type: 'image',
+    image: {
+      type: 'external',
+      external: {
+        url: link,
+      },
+    },
+  } as ImageBlock;
 }
