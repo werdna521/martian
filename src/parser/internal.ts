@@ -1,5 +1,6 @@
 import * as md from '../markdown';
 import * as notion from '../notion';
+import {RichText} from '../notion';
 
 function parseInline(
   element: md.PhrasingContent,
@@ -68,23 +69,50 @@ function parseParagraph(
       value,
     };
   }) as Paragraph[];
+  console.log(JSON.stringify(paragraph, null, 2));
 
-  return paragraph.reduce((acc, p, index) => {
-    const {type, value} = p;
-    const groupCount = acc.length;
-    const firstGroups = acc.slice(0, groupCount - 1);
-    const lastGroup = acc[groupCount - 1] || [];
+  const nodes = [];
+  let temp: any[] = [];
+  for (let i = 0; i < paragraph.length; i++) {
+    const item = paragraph[i];
+    const prevItem = paragraph?.[i - 1];
 
-    if (type === 'image') {
-      if (paragraph[index - 1]?.type === 'rich-text')
-        return [...firstGroups, notion.paragraph(lastGroup), value];
-      return [...firstGroups, lastGroup, value];
+    if (!prevItem) {
+      if (item.type === 'image') {
+        nodes.push(item.value);
+      } else if (item.type === 'rich-text') {
+        temp = [item.value];
+      }
+    } else if (i === paragraph.length - 1) {
+      if (item.type === 'image') {
+        if (prevItem.type === 'rich-text') {
+          nodes.push(notion.paragraph(temp));
+          temp = [];
+        }
+        nodes.push(item.value);
+      } else if (item.type === 'rich-text') {
+        temp = [...temp, item.value];
+        nodes.push(notion.paragraph(temp));
+        temp = [];
+      }
+    } else {
+      if (item.type === 'image') {
+        if (prevItem.type === 'rich-text') {
+          nodes.push(notion.paragraph(temp));
+          temp = [];
+        }
+        nodes.push(item.value);
+      } else if (item.type === 'rich-text') {
+        temp = [...temp, item.value];
+      }
     }
+  }
 
-    if (paragraph[index - 1]?.type === 'image')
-      return [...firstGroups, lastGroup, [value]];
-    return [...firstGroups, [...lastGroup, value]];
-  }, [] as any[]);
+  if (temp.length > 0) {
+    nodes.push(notion.paragraph(temp[0]));
+  }
+
+  return nodes;
 }
 
 function parseHeading(
@@ -144,7 +172,7 @@ function parseNode(node: md.FlowContent): (notion.Block | notion.ImageBlock)[] {
       return [parseHeading(node)];
 
     case 'paragraph':
-      return [...parseParagraph(node)];
+      return parseParagraph(node);
 
     case 'code':
       return [parseCode(node)];
